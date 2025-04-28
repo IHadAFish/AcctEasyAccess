@@ -13,7 +13,7 @@ It addresses key issues identified by intergrating essential info and quick acce
 - Difficulty quickly extracting key account info(registration/activation/billing dates, contract details) from the English-only CRM interface.
 - Needing to remember or manually look up account plan details and CRM tag meanings.
 - Challenges in handling specific account types requiring special processing.
-- Usability issues within the AIjia interface, such as missing functional account IDs in dropdowns and disruptive blank popups.
+- Usability issues within the certain product's interface, such as missing functional account IDs in dropdowns and disruptive blank popups.
 
 This tool was created to streamline these tasks, reduce cognitive load, and free up agent time.
 
@@ -26,7 +26,7 @@ The tool provides the following core functionalities directly integrated into th
 - **Clear Account Information:** Presents key account details (registration/activation/billing time, contract period) clearly, often translated or summarized for easier understanding.
 - **Detailed Plan Information:** Displays plan ID and name. Clicking the plan name provides detailed information (contract period, fees, discounts, notes) in a popup window fetched from the backend.
 - **Configurable Account Reminders:** Displays custom reminders for specific accounts based on tags, market, product, account ID, or phone number. Management can configure these reminders, and agents can mark them as processed.
-- **Enhanced AIjia Interface:** Adds functional account IDs directly into the AIjia dropdown menu and removes disruptive blank popups when hovering over account details.
+- **Enhanced Product Interface:** Adds functional account IDs directly into the product dropdown menu and removes disruptive blank popups when hovering over account details.
 
 ## Architecture
 
