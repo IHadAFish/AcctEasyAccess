@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>提醒管理</title>
+    <style>
+        body {
+            font-family: sans-serif;
+        }
+
+        input:invalid,
+        select:invalid,
+        textarea:invalid {
+            border: solid 1px red;
+            border-radius: 3px;
+        }
+
+        .form-section {
+            border: solid 1px #ccc;
+            margin: 1em;
+            padding: 1em;
+            border-radius: 5px;
+        }
+
+        .form-section h2 {
+            margin-top: 0;
+        }
+
+        form {
+            margin-bottom: 1em;
+        }
+
+        label {
+            display: inline-block;
+            min-width: 100px;
+            margin-right: 10px;
+            vertical-align: top;
+            /* Align labels nicely with multi-line inputs */
+            text-align: right;
+        }
+
+        input[type="text"],
+        input[type="date"],
+        input[type="number"],
+        select,
+        textarea {
+            padding: 5px;
+            margin-bottom: 5px;
+            width: 250px;
+            /* Consistent width */
+            box-sizing: border-box;
+            /* Include padding in width */
+        }
+
+        textarea {
+            height: 5em;
+            vertical-align: top;
+        }
+
+        input[type="checkbox"] {
+            width: auto;
+            /* Checkboxes don't need fixed width */
+            margin-left: 0;
+        }
+
+        .checkbox-group label {
+            min-width: auto;
+            /* Labels for checkboxes don't need fixed width */
+            margin-left: 5px;
+            margin-right: 15px;
+            text-align: left;
+        }
+
+        button {
+            padding: 5px 10px;
+            margin-left: 110px;
+            /* Align with inputs */
+            margin-top: 5px;
+        }
+
+        .action-button {
+            margin-left: 0;
+            /* Reset margin for buttons inside table */
+            margin-right: 5px;
+        }
+
+        #resultsTable {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1em;
+        }
+
+        #resultsTable th,
+        #resultsTable td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        #resultsTable th {
+            background-color: #f2f2f2;
+        }
+
+        .error {
+            color: red;
+            font-weight: bold;
+        }
+
+        .success {
+            color: green;
+            font-weight: bold;
+        }
+
+        #status {
+            margin: 1em;
+            padding: 10px;
+            border: 1px solid transparent;
+            border-radius: 4px;
+        }
+
+        #status.hidden {
+            display: none;
+        }
+
+        #status.processing {
+            border-color: #eee;
+            background-color: #f9f9f9;
+            color: #555;
+        }
+
+        #status.error {
+            border-color: #f5c6cb;
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+
+        #status.success {
+            border-color: #c3e6cb;
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        /* Styles for conditionally shown fields */
+        .conditional-field {
+            display: none;
+            /* Hidden by default */
+        }
+
+        .conditional-field.visible {
+            display: block;
+            /* Shown when needed */
+            margin-bottom: 5px;
+            /* Add some spacing */
+        }
+
+        .conditional-field label {
+            display: inline-block;
+        }
+
+        .conditional-field input,
+        .conditional-field select {
+            display: inline-block;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="status" class="hidden"></div>
+
+    <!-- Insert Section -->
+    <div class="form-section">
+        <h2>添加/修改提醒</h2>
+        <form id="insertForm" enctype="multipart/form-data">
+            <!-- Section for displaying Reminder ID during edit -->
+            <div id="reminderIdSection" style="display: none; margin-bottom: 10px;">
+                 <label for="reminderId">提醒 ID:</label>
+                 <input type="text" id="reminderId" name="reminder_id" readonly style="background-color: #eee; cursor: not-allowed;">
+                 <br>
+            </div>
+
+            <label for="insertTitle">标题:</label>
+            <input type="text" id="insertTitle" name="title" required><br>
+
+            <label for="insertContent">内容:</label>
+            <textarea id="insertContent" name="content" required></textarea><br>
+
+            
+            <label for="insertStartDate">开始日期:</label>
+            <input type="date" id="insertStartDate" name="start_date" required><br>
+
+            <label for="insertExpireDate">结束日期:</label>
+            <input type="date" id="insertExpireDate" name="expire_date">
+            <span>(留空为长期有效)</span><br>
+
+            <label for="enableRecurrence">重复:</label>
+            <input type="checkbox" id="enableRecurrence" onchange="toggleRecurrenceField()"><br>
+
+            <div id="recurrenceIntervalField" class="conditional-field">
+                <label for="insertRecurInterval">重复周期 (天):</label>
+                <input type="number" min="-1" value="0" id="insertRecurInterval" name="recurrent_interval">
+                <span>(0表示一直重复)</span><br>
+            </div>
+
+            <label for="isGlobal">所有账户:</label>
+            <input type="checkbox" id="isGlobal" name="is_global" onchange="toggleInsertFields()"><br>
+
+            <div id="marketField" class="conditional-field">
+                <label for="insertMarket">市场:</label>
+                <select id="insertMarket" name="market" multiple required size="3">
+                    <option value="All">All</option>
+                    <option value="USCN">USCN</option>
+                    <option value="CACN">CACN</option>
+                </select><br>
+            </div>
+
+            <div id="businessNameField" class="conditional-field">
+                <label for="businessName">产品 (全局):</label>
+                <select id="businessName" name="business_name" multiple size="8" required>
+                    <option value="All">All</option>
+                    <option value="REMOVED">REMOVED</option>
+                </select>
+                <span>(Ctrl+左键 可多选)</span>
+                <br>
+            </div>
+
+            <div id="acctFileField" class="conditional-field">
+                <label for="acctFile">账户列表:</label>
+                <input type="file" id="acctFile" name="file" accept=".xlsx">
+                <br>
+            </div>
+
+            <button type="submit">添加/修改</button>
+            <button type="button" id="clearFormButton" style="margin-left: 10px;">清空</button> <!-- Added Clear button -->
+        </form>
+    </div>
+
+    <!-- Search Section -->
+    <div class="form-section">
+        <h2>搜索提醒</h2>
+        <form id="searchByIdForm">
+            <label for="searchId">提醒 ID:</label>
+            <input type="number" id="searchId" name="searchId" required>
+            <button type="submit">按 ID 搜索</button>
+        </form>
+        <form id="searchByDateForm">
+            <label for="startDate">创建开始日期:</label>
+            <input type="date" id="startDate" name="startDate" required><br>
+            <label for="endDate">创建结束日期:</label>
+            <input type="date" id="endDate" name="endDate" required>
+            <button type="submit">按创建日期搜索</button>
+        </form>
+        <form id="searchByTitleForm">
+            <label for="searchTitle">标题包含:</label>
+            <input type="text" id="searchTitle" name="searchTitle" required>
+            <button type="submit">按标题搜索</button>
+        </form>
+    </div>
+
+    <!-- Results Section -->
+    <div class="form-section">
+        <h2>搜索结果</h2>
+        <div id="resultsArea">
+            <p>暂无结果</p>
+            <table id="resultsTable" style="display:none;">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>标题</th>
+                        <th>内容</th>
+                        <th>市场</th>
+                        <th>所有账户</th>
+                        <th>业务</th>
+                        <th>开始日期</th>
+                        <th>结束日期</th>
+                        <th>重复周期</th>
+                        <th>创建时间</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Results will be populated here -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Actions Section -->
+    <div class="form-section">
+        <h2>删除提醒</h2>
+        <form id="deleteForm">
+            <label for="deleteId">提醒 ID:</label>
+            <input type="number" id="deleteId" name="deleteId" required>
+            <button type="submit">删除</button>
+        </form>
+    </div>
+
+    <!-- Get Status Section -->
+    <div class="form-section">
+        <h2>获取处理状态</h2>
+        <form id="getStatusForm">
+            <label for="statusId">提醒 ID:</label>
+            <input type="number" id="statusId" name="statusId" required>
+            <button type="submit">获取状态文件</button>
+        </form>
+    </div>
+
+    <script>
+        document.getElementById("insertExpireDate").min = new Date().toISOString().split("T")[0];
+        document.getElementById("insertStartDate").value = new Date().toISOString().split("T")[0];
+
+        const statusDiv = document.getElementById('status');
+        const resultsArea = document.getElementById('resultsArea');
+        const resultsTable = document.getElementById('resultsTable');
+        const resultsTbody = resultsTable.querySelector('tbody');
+
+        // --- Insert Form Logic ---
+        const isGlobalCheckbox = document.getElementById('isGlobal');
+        const businessNameField = document.getElementById('businessNameField');
+        const acctFileField = document.getElementById('acctFileField');
+        const businessNameSelect = document.getElementById('businessName');
+        const acctFileInput = document.getElementById('acctFile');
+        const marketField = document.getElementById('marketField'); // Added
+        const marketSelect = document.getElementById('insertMarket'); // Added
+        const enableRecurrenceCheckbox = document.getElementById('enableRecurrence');
+        const recurrenceIntervalField = document.getElementById('recurrenceIntervalField');
+        const recurIntervalInput = document.getElementById('insertRecurInterval');
+
+        function toggleRecurrenceField() {
+            if (enableRecurrenceCheckbox.checked) {
+                recurrenceIntervalField.classList.add('visible');
+                recurIntervalInput.required = true; // Make required if recurrence is enabled
+                recurIntervalInput.value = '0';
+            } else {
+                recurrenceIntervalField.classList.remove('visible');
+                recurIntervalInput.required = false;
+                recurIntervalInput.value = '-1';
+            }
+        }
+
+        function toggleInsertFields() {
+            if (isGlobalCheckbox.checked) {
+                // Show fields relevant for global reminders
+                marketField.classList.add('visible');
+                marketSelect.required = true;
+                businessNameField.classList.add('visible');
+                businessNameSelect.required = true;
+                // Hide fields relevant for non-global reminders
+                acctFileField.classList.remove('visible');
+                acctFileInput.required = false;
+            } else {
+                // Hide fields relevant for global reminders
+                marketField.classList.remove('visible');
+                marketSelect.required = false;
+                businessNameField.classList.remove('visible');
+                businessNameSelect.required = false;
+                // Show fields relevant for non-global reminders
+                acctFileField.classList.add('visible');
+                acctFileInput.required = true;
+            }
+        }
+        // Initial call to set visibility based on default checkbox state
+        toggleInsertFields();
+        // Add listener and initial call for recurrence field
+        toggleRecurrenceField(); // Set initial state on load
+
+
+        // --- Utility Functions ---
+        function showStatus(message, type = 'processing') {
+            statusDiv.textContent = message;
+            statusDiv.className = type; // 'processing', 'success', 'error'
+            statusDiv.scrollIntoView({ behavior: 'smooth', block: 'start' }); // Scroll to show status
+        }
+
+        function clearStatus() {
+            statusDiv.textContent = '';
+            statusDiv.className = 'hidden';
+        }
+
+        // Populate the insert/edit form with reminder data
+        function populateFormForEdit(reminderId) {
+            const reminder = reminderData[reminderId];
+            if (!reminder) {
+                console.error("Reminder data not found for ID:", reminderId);
+                showStatus("无法加载提醒数据进行编辑。", 'error');
+                return;
+            }
+
+            clearStatus(); // Clear any previous status messages
+            clearForm(false); // Clear form but don't scroll (optional)
+
+            // Populate basic fields
+            document.getElementById('reminderIdSection').style.display = 'block'; // Show ID section
+            document.getElementById('reminderId').value = reminder.id;
+            document.getElementById('insertTitle').value = reminder.title || '';
+            document.getElementById('insertContent').value = reminder.content || '';
+            // Format dates for input type="date" (YYYY-MM-DD)
+            document.getElementById('insertStartDate').value = reminder.start_date ? new Date(reminder.start_date).toISOString().split('T')[0] : '';
+            document.getElementById('insertExpireDate').value = reminder.expire_date < new Date("3000-1-1") ? new Date(reminder.expire_date).toISOString().split('T')[0] : '';
+
+            // Handle recurrence checkbox and value
+            enableRecurrenceCheckbox.checked = reminder.recurrent_interval >= 0;
+            toggleRecurrenceField();
+            recurIntervalInput.value = reminder.recurrent_interval;
+
+            // Set checkbox and trigger visibility toggle
+            isGlobalCheckbox.checked = reminder.is_global;
+            toggleInsertFields();
+
+
+            // Populate conditional fields if global
+            if (reminder.is_global) {
+                // Market - Select options based on comma-separated string or array
+                const markets = reminder.market ? (Array.isArray(reminder.market) ? reminder.market : reminder.market.split(',')) : [];
+                Array.from(marketSelect.options).forEach(option => {
+                    option.selected = markets.includes(option.value);
+                });
+
+                // Business Name - Select options based on array or is_all_business flag
+                if (reminder.is_all_business) {
+                     Array.from(businessNameSelect.options).forEach(option => {
+                        option.selected = (option.value === 'All');
+                    });
+                } else {
+                    const businessNames = reminder.business_names.split(",") || [];
+                     Array.from(businessNameSelect.options).forEach(option => {
+                        option.selected = businessNames.includes(option.value);
+                    });
+                }
+            } else {
+                 acctFileInput.value = '';
+            }
+        }
+
+        // Clear the insert/edit form
+        function clearForm(scrollToTop = true) {
+            const form = document.getElementById('insertForm');
+            form.reset(); // Resets most standard form elements
+
+            // Manually clear/reset elements not handled by form.reset() or needing specific state
+            document.getElementById('reminderIdSection').style.display = 'none'; // Hide ID section
+            document.getElementById('reminderId').value = ''; // Clear the ID value
+
+            // Reset multi-selects (optional, form.reset() might handle this depending on browser)
+            Array.from(marketSelect.options).forEach(option => option.selected = false);
+            Array.from(businessNameSelect.options).forEach(option => option.selected = false);
+
+            // Ensure conditional fields are reset to their default state
+            toggleInsertFields();
+            // Reset recurrence checkbox and field
+            enableRecurrenceCheckbox.checked = false;
+            toggleRecurrenceField();
+
+
+            clearStatus(); // Clear any status messages
+
+            if (scrollToTop) {
+                form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+
+        function displayResults(reminders) {
+            resultsTbody.innerHTML = ''; // Clear previous results
+            resultsArea.querySelector('p').style.display = 'none';
+            resultsTable.style.display = 'table';
+
+            if (!reminders || reminders.length === 0) {
+                resultsArea.querySelector('p').textContent = '未找到匹配的提醒。';
+                resultsArea.querySelector('p').style.display = 'block';
+                resultsTable.style.display = 'none';
+                return;
+            }
+
+            // Store reminders data locally to populate form later
+            reminderData = {}; // Store globally for access by populate function
+            reminders.forEach(rem => {
+                reminderData[rem.id] = rem; // Store by ID
+
+                const row = resultsTbody.insertRow();
+                // Make ID clickable
+                const idCell = row.insertCell();
+                const idLink = document.createElement('a');
+                idLink.href = '#insertForm'; // Link to the form section
+                idLink.textContent = rem.id;
+                idLink.style.cursor = 'pointer';
+                idLink.style.textDecoration = 'underline';
+                idLink.onclick = (e) => {
+                    e.preventDefault(); // Prevent default anchor jump
+                    populateFormForEdit(rem.id);
+                    document.getElementById('insertForm').scrollIntoView({ behavior: 'smooth', block: 'start' }); // Scroll to form
+                };
+                idCell.appendChild(idLink);
+
+                row.insertCell().textContent = rem.title;
+                row.insertCell().textContent = rem.content;
+                row.insertCell().textContent = rem.market;
+                row.insertCell().textContent = rem.is_global ? '是' : '否';
+                row.insertCell().textContent = rem.is_all_business ? 'All' : rem.business_names;
+                row.insertCell().textContent = rem.start_date ? new Date(rem.start_date).toLocaleDateString() : '';
+                row.insertCell().textContent = new Date(rem.expire_date) < new Date("3000-1-1") ? new Date(rem.expire_date).toLocaleDateString() : '';
+                
+                let recur_int = Number(rem.recurrent_interval);
+                row.insertCell().textContent = recur_int > 0 ? recur_int : (recur_int == 0 ? "一直重复" : "不重复");
+                row.insertCell().textContent = rem.create_date ? new Date(rem.create_date).toLocaleDateString() : '';
+
+                if (!rem.is_global) {
+                    // Add action buttons within the results table
+                    const actionsCell = row.insertCell();
+                    const getAcctsButton = document.createElement('button');
+                    getAcctsButton.textContent = '下载账户列表';
+                    getAcctsButton.classList.add('action-button'); // Use class for styling
+                    getAcctsButton.onclick = () => handleGetAccts(rem.id);
+                    actionsCell.appendChild(getAcctsButton);
+                }
+            });
+        }
+
+        async function pollTaskStatus(taskId, operationType = '操作') {
+            let attempts = 0;
+            const maxAttempts = 30; // Increased attempts for potentially longer tasks like insert
+            const interval = 2000; // 2 seconds
+
+            showStatus(`${operationType}处理中... 任务 ID: ${taskId}`, 'processing');
+
+            while (attempts < maxAttempts) {
+                try {
+                    const response = await fetch(`/tasks/${taskId}`);
+                    if (!response.ok) {
+                        let errorMsg = `服务器错误 (状态 ${response.status})`;
+                        try {
+                            const errorData = await response.json();
+                            errorMsg = errorData.message || errorData.error || JSON.stringify(errorData);
+                        } catch (parseError) { /* Ignore */ }
+                        throw new Error(errorMsg);
+                    }
+
+                    const taskData = await response.json();
+
+                    if (taskData.status === 'SUCCESS') {
+                        showStatus(`${operationType}成功完成!`, 'success');
+                        return taskData.result;
+                    } else if (taskData.status === 'FAILURE') {
+                        let failureMsg = `${operationType}失败`;
+                        if (taskData.result && taskData.result.exc_message) {
+                            failureMsg += `: ${taskData.result.exc_message}`;
+                        } else if (taskData.message) {
+                            failureMsg += `: ${taskData.message}`;
+                        }
+                        throw new Error(failureMsg);
+                    }
+                    showStatus(`${operationType}处理中... 状态: ${taskData.status}`, 'processing');
+
+                } catch (error) {
+                    console.error(`Error polling task status for ${operationType}:`, error);
+                    showStatus(`轮询错误: ${error.message}`, 'error');
+                    throw error;
+                }
+
+                attempts++;
+                await new Promise(resolve => setTimeout(resolve, interval));
+            }
+            showStatus(`${operationType}处理超时。请稍后检查任务状态。`, 'error');
+            throw new Error(`${operationType}处理超时`);
+        }
+
+        // --- Event Handlers ---
+
+        document.getElementById('insertForm').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            clearStatus();
+            const form = event.target;
+
+            const isGlobal = isGlobalCheckbox.checked;
+            const marketSelect = document.getElementById('insertMarket');
+            const fileInput = acctFileInput; // Reference kept from outer scope
+
+            // Construct reminder data object first
+            const reminderIdValue = document.getElementById('reminderId').value.trim(); // Get potential ID
+            const reminderData = {
+                // Add reminder_id if it exists (for updates)
+                ...(reminderIdValue && { id: parseInt(reminderIdValue, 10) }), // Use spread syntax conditionally
+                title: document.getElementById('insertTitle').value.trim(),
+                content: document.getElementById('insertContent').value.trim(),
+                // market and business_name added conditionally below
+                start_date: document.getElementById('insertStartDate').value,
+                expire_date: document.getElementById('insertExpireDate').value,
+                recurrent_interval: document.getElementById('insertRecurInterval').value,
+                is_global: isGlobal,
+                is_all_business: false,
+                market: ['USCN', 'CACN']
+            };
+
+            // Determine and add market and business_name if global
+            if (isGlobal) {
+                // Market (required field ensures selection)
+                reminderData.market = Array.from(marketSelect.selectedOptions).map(opt => opt.value);
+
+                // Business (required field ensures selection)
+                const selectedBusinessOptions = Array.from(businessNameSelect.selectedOptions);
+
+                if (selectedBusinessOptions.some(opt => opt.value === 'All')) {
+                    reminderData.is_all_business = true;
+                } else {
+                    // Otherwise, send the specifically selected names (required ensures > 0)
+                    reminderData.business_name = selectedBusinessOptions.map(opt => opt.value);
+                }
+            }
+            // If not global, market and business_name are not added
+
+            // Proceed with fetch request
+            try {
+                showStatus('正在提交添加请求...', 'processing'); // Keep status for async operation
+                let response;
+                let fetchOptions = {
+                    method: 'POST',
+                };
+
+                if (isGlobal) {
+                    // Send JSON for global reminders
+                    fetchOptions.headers = { 'Content-Type': 'application/json' };
+                    fetchOptions.body = JSON.stringify(reminderData);
+                    response = await fetch('/reminder/insert', fetchOptions);
+                } else {
+                    // Send FormData for non-global reminders (includes file)
+                    const formData = new FormData();
+                    // Send JSON data as a string in the 'reminder_data' field
+                    formData.append('reminder_data', JSON.stringify(reminderData));
+                    formData.append('file', fileInput.files[0]);
+                    fetchOptions.body = formData; // No Content-Type header needed for FormData
+
+                    showStatus('正在上传文件和数据...', 'processing');
+                    response = await fetch('/reminder/insert', fetchOptions);
+                }
+
+                const result = await response.json();
+
+                if (!response.ok) {
+                    const errorMsg = result.message || response.statusText || `HTTP error ${response.status}`;
+                    throw new Error(errorMsg);
+                }
+
+                showStatus(`正在处理添加... 任务 ID: ${result.task_id}`, 'processing');
+                await pollTaskStatus(result.task_id, '添加提醒');
+                document.getElementById('insertForm').reset(); // Reset form on success
+                toggleInsertFields(); // Reset conditional field visibility
+
+            } catch (error) {
+                console.error('Insert error:', error);
+                showStatus(`添加失败: ${error.message}`, 'error');
+            }
+        });
+
+        document.getElementById('searchByIdForm').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            clearStatus();
+            const reminderId = document.getElementById('searchId').value.trim();
+            if (!reminderId) return;
+
+            try {
+                showStatus('正在提交搜索请求...', 'processing');
+                const response = await fetch(`/reminder/search/id/${reminderId}`);
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.message || `无法搜索 ID ${reminderId}`);
+                }
+
+                showStatus(`正在获取结果... 任务 ID: ${result.task_id}`, 'processing');
+                const reminders = await pollTaskStatus(result.task_id, '搜索');
+                displayResults(reminders);
+
+            } catch (error) {
+                console.error('Search by ID error:', error);
+                showStatus(`搜索失败: ${error.message}`, 'error');
+                resultsArea.querySelector('p').textContent = `搜索失败: ${error.message}`;
+                resultsArea.querySelector('p').style.display = 'block';
+                resultsTable.style.display = 'none';
+            }
+        });
+
+        document.getElementById('searchByDateForm').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            clearStatus();
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            if (!startDate || !endDate) return;
+
+            try {
+                showStatus('正在提交搜索请求...', 'processing');
+                const response = await fetch(`/reminder/search/createtime?start_date=${startDate}&end_date=${endDate}`);
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.message || `无法按日期搜索`);
+                }
+
+                showStatus(`正在获取结果... 任务 ID: ${result.task_id}`, 'processing');
+                const reminders = await pollTaskStatus(result.task_id, '搜索');
+                displayResults(reminders);
+
+            } catch (error) {
+                console.error('Search by date error:', error);
+                showStatus(`搜索失败: ${error.message}`, 'error');
+                resultsArea.querySelector('p').textContent = `搜索失败: ${error.message}`;
+                resultsArea.querySelector('p').style.display = 'block';
+                resultsTable.style.display = 'none';
+            }
+        });
+
+        document.getElementById('searchByTitleForm').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            clearStatus();
+            const titleQuery = document.getElementById('searchTitle').value.trim();
+            if (!titleQuery) return;
+
+            try {
+                showStatus('正在提交搜索请求...', 'processing');
+                const response = await fetch(`/reminder/search/title?title=${encodeURIComponent(titleQuery)}`);
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.message || `无法按标题搜索`);
+                }
+
+                showStatus(`正在获取结果... 任务 ID: ${result.task_id}`, 'processing');
+                const reminders = await pollTaskStatus(result.task_id, '搜索');
+                displayResults(reminders);
+
+            } catch (error) {
+                console.error('Search by title error:', error);
+                showStatus(`搜索失败: ${error.message}`, 'error');
+                resultsArea.querySelector('p').textContent = `搜索失败: ${error.message}`;
+                resultsArea.querySelector('p').style.display = 'block';
+                resultsTable.style.display = 'none';
+            }
+        });
+
+        async function handleGetAccts(reminderId) {
+            if (!reminderId) return;
+            clearStatus();
+            showStatus(`正在请求生成账户列表 (ID: ${reminderId})...`, 'processing');
+
+            try {
+                const response = await fetch(`/reminder/getaccts/${reminderId}`);
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.message || `请求失败 (ID: ${reminderId})`);
+                }
+
+                const taskId = result.task_id;
+                showStatus(`正在获取...`, 'processing');
+
+                await pollTaskStatus(taskId, '获取账户列表');
+
+                showStatus(`获取账户列表成功，正在准备下载...`, 'success');
+                window.location.href = `/reminder/download/${taskId}`;
+
+                setTimeout(clearStatus, 5000);
+
+            } catch (error) {
+                console.error('Get Accounts error:', error);
+                showStatus(`获取账户列表失败: ${error.message}`, 'error');
+            }
+        }
+
+        async function handleDelete(reminderId) {
+            if (!reminderId) return;
+
+            if (!confirm(`确定要删除提醒 ID ${reminderId} 吗？此操作无法撤销。`)) {
+                return;
+            }
+            clearStatus();
+
+            try {
+                showStatus(`正在提交删除请求 (ID: ${reminderId})...`, 'processing');
+                const response = await fetch(`/reminder/delete/${reminderId}`, {
+                    method: 'DELETE'
+                });
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.message || `无法删除提醒 ${reminderId}`);
+                }
+
+                showStatus(`正在确认删除... 任务 ID: ${result.task_id}`, 'processing');
+                await pollTaskStatus(result.task_id, '删除');
+                // Clear results or prompt refresh after successful deletion
+                resultsTbody.innerHTML = '';
+                resultsArea.querySelector('p').textContent = `提醒 ${reminderId} 已删除。请重新搜索以更新列表。`;
+                resultsArea.querySelector('p').style.display = 'block';
+                resultsTable.style.display = 'none';
+
+            } catch (error) {
+                console.error('Delete error:', error);
+                showStatus(`删除失败: ${error.message}`, 'error');
+            }
+        }
+
+        document.getElementById('deleteForm').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const reminderId = document.getElementById('deleteId').value.trim();
+            handleDelete(reminderId);
+        });
+
+        document.getElementById('clearFormButton').addEventListener('click', () => {
+            clearForm();
+        });
+
+        document.getElementById('getStatusForm').addEventListener('submit', async function (e) {
+            e.preventDefault();
+            clearStatus();
+            const reminderId = document.getElementById('statusId').value.trim();
+
+            showStatus(`正在请求提醒状态...`, 'processing');
+
+            try {
+                const response = await fetch(`/reminder/status/${reminderId}`);
+                const data = await response.json();
+
+                if (!response.ok || !data.task_id) {
+                    throw new Error(data.message || `HTTP error! status: ${response.status}`);
+                }
+
+                const taskId = data.task_id;
+                const actionDesc = `获取提醒状态。。。`;
+
+                try {
+                    await pollTaskStatus(taskId, actionDesc);
+                    showStatus(`正在开始下载...`, 'success');
+                    window.location.href = `/reminder/download/${taskId}`;
+                    setTimeout(clearStatus, 3000);
+                } catch (pollError) {
+                    console.error(`Polling/Task failed for ${actionDesc}:`, pollError);
+                }
+
+            } catch (requestError) {
+                console.error('Error requesting status file:', requestError);
+                showStatus(`请求失败: ${requestError.message}`, 'error');
+            }
+        });
+
+    </script>
+</body>
+
+</html>
