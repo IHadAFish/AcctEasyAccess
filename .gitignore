@@ -1,0 +1,8 @@
+.vscode
+sev_venv
+.env
+test_venv
+__pycache__
+temp.*
+celerybeat-schedule
+others/

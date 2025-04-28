@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>计划信息管理</title>
+    <style>
+        input:invalid {
+            border: solid 1px red;
+            border-radius: 3px;
+        }
+
+        #manualUploadForm {
+            display: grid;
+            grid-template-columns: auto auto;
+            row-gap: 1em;
+            justify-items: left;
+            width: 50%;
+        }
+
+        .separator {
+            border: solid 1px gray;
+            margin: 1em;
+        }
+
+        form {
+            margin: 1em;
+        }
+
+        button {
+            padding: 3px 5px;
+        }
+
+        input, textarea {
+            font-family: sans-serif;
+            font-size: 14px;
+        }
+    </style>
+</head>
+
+<body>
+    <form id="searchForm">
+        <label for="searchPlanId">计划ID:</label>
+        <input type="text" id="searchPlanId" name="searchPlanId" pattern="\s*\d{6}\s*" title="6位数字计划ID" required>
+        <button type="submit">搜索</button>
+    </form>
+    <div class="separator"></div>
+    <form id="manualUploadForm">
+        <label for="plan_id">计划ID:</label>
+        <input type="text" id="plan_id" name="plan_id" pattern="\s*\d{6}\s*" title="6位数字计划ID" required>
+
+        <label for="name">计划名称:</label>
+        <textarea id="name" name="name" pattern=".+" required></textarea>
+
+        <label for="contract">合约:</label>
+        <input type="text" id="contract" name="contract" pattern=".+" required>
+
+        <label for="business_name">产品:</label>
+        <select id="business_name" name="business_name" required>
+            <option value="REMOVED">REMOVED</option>
+        </select>
+
+        <label for="fee">费用:</label>
+        <input type="text" id="fee" name="fee">
+
+        <label for="discount">优惠:</label>
+        <textarea id="discount" name="discount"></textarea>
+
+        <label for="note">备注:</label>
+        <textarea id="note" name="note" style="height: 5em;"></textarea>
+        <button type="submit" style="width: fit-content; grid-column: span 2; justify-self: center;">提交/修改</button>
+    </form>
+
+    <div class="separator"></div>
+    <form id="uploadForm">
+        <input type="file" id="xlsxFile" name="xlsxFile" accept=".xlsx" required>
+        <button type="submit">上传</button>
+    </form>
+
+    <script>
+        async function pollTaskStatus(taskId) {
+            let attempts = 0;
+            const maxAttempts = 10;
+            const interval = 1000; // 1 second
+
+            while (attempts < maxAttempts) {
+                try {
+                    const response = await fetch(`/tasks/${taskId}`);
+                    const taskData = await response.json();
+
+                    if (response.ok) {
+                        if (taskData.status === 'SUCCESS') {
+                            return taskData.result;
+                        } else if (taskData.status === 'FAILURE') {
+                            throw new Error(taskData.message || '上传失败');
+                        } // else, keep polling (PENDING)
+                    } else {
+                        throw new Error(`无法连接至服务器: ${taskData.message}`);
+                    }
+                } catch (error) {
+                    console.error('Error polling task status:', error);
+                    throw error; // Re-throw to be caught by the calling function
+                }
+
+                attempts++;
+                await new Promise(resolve => setTimeout(resolve, interval));
+            }
+
+            throw new Error('连接超时');
+        }
+
+        document.getElementById('manualUploadForm').addEventListener('submit', async (event) => {
+            event.preventDefault();
+
+            const formData = {
+                plan_id: document.getElementById('plan_id').value.trim(),
+                name: document.getElementById('name').value.trim(),
+                contract: document.getElementById('contract').value.trim(),
+                business_name: document.getElementById('business_name').value,
+                fee: document.getElementById('fee').value.trim() || '',
+                discount: document.getElementById('discount').value.trim() || '',
+                note: document.getElementById('note').value.trim() || ''
+            };
+
+            try {
+                const response = await fetch('/plan/update', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    // Start polling for task status
+                    try {
+                        const planData = await pollTaskStatus(result.task_id);
+                        alert(`计划上传成功`);
+                    } catch (pollError) {
+                        alert(`计划上传失败: ${pollError}`);
+                    }
+
+                } else {
+                    alert(`计划上传失败: ${JSON.stringify(result)}`);
+                }
+            } catch (error) {
+                alert(`计划上传失败: ${error}`);
+            }
+        });
+
+        document.getElementById('searchForm').addEventListener('submit', async (event) => {
+            event.preventDefault();
+
+            const searchPlanId = document.getElementById('searchPlanId').value.trim();
+
+            try {
+                const response = await fetch(`/plan/${searchPlanId}`);
+                const taskData = await response.json();
+
+                if (response.ok) {
+                    try {
+                        const planData = await pollTaskStatus(taskData.task_id);
+                        // Populate the manual upload form with the retrieved data
+                        document.getElementById('plan_id').value = planData.plan_id;
+                        document.getElementById('name').value = planData.name;
+                        document.getElementById('contract').value = planData.contract;
+                        document.getElementById('business_name').value = planData.business;
+                        document.getElementById('fee').value = planData.fee || '';
+                        document.getElementById('discount').value = planData.discount || '';
+                        document.getElementById('note').value = planData.note || '';
+                    } catch (pollError) {
+                        alert(`读取计划失败: ${pollError}`);
+                    }
+                } else {
+                    alert(`读取计划失败: ${JSON.stringify(taskData)}`);
+                }
+            } catch (error) {
+                alert(`读取计划失败: ${error}`);
+            }
+        });
+
+        document.getElementById('uploadForm').addEventListener('submit', async (event) => {
+            event.preventDefault();
+
+            const fileInput = document.getElementById('xlsxFile');
+            const file = fileInput.files[0];
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('/plan/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    // Start polling for task status
+                    try {
+                        const planData = await pollTaskStatus(result.task_id);
+                        alert(`表格上传成功`);
+                    } catch (pollError) {
+                        alert(`表格上传失败: ${pollError}`);
+                    }
+                } else {
+                    alert(`表格上传失败: ${JSON.stringify(planData)}`);
+                }
+            } catch (error) {
+                alert(`表格上传失败: ${error}`);
+            }
+        });
+    </script>
+</body>
+
+</html>
