@@ -1,6 +1,8 @@
 # AcctEasyAccess
 A operater helper tool w/front&backend I made for the Call Center I work for.
 Uploaded here for reference/sanity/backup.
+
+Check README_CN.md for more details. Might add an EN ver later?
 ## Stack
 - Frontend: JS/HTML/CSS, some via Violentmonkey(AcctEasyAccess.js)
 - Backend: Python(Flask, Gunicorn), Celery, Redis(general cache&celery broker)
