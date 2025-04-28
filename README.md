@@ -2,6 +2,8 @@
 
 A browser plugin and backend system I made for the Call Center I work for. Designed to enhance efficiency and user experience for call center agents using the internal CRM platform.
 
+Uploaded here for reference/sanity/backup. Check README_CN.md for more details.(Maybe I should add a EN ver.)
+
 ## Problem & Motivation
 
 This tool was developed to address several pain points faced by agents during daily CRM interactions [1]:
